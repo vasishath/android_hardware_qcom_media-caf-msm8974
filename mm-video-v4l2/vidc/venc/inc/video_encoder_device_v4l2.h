@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -174,6 +174,27 @@ struct msm_venc_slice_delivery {
     unsigned long enable;
 };
 
+struct msm_venc_hierlayers {
+    unsigned int numlayers;
+};
+
+struct msm_venc_ltrinfo {
+    unsigned int enabled;
+    unsigned int count;
+};
+
+struct msm_venc_perf_level {
+    unsigned int perflevel;
+};
+
+struct msm_venc_vui_timing_info {
+    unsigned int enabled;
+};
+
+struct msm_venc_peak_bitrate {
+    unsigned int peakbitrate;
+};
+
 enum v4l2_ports {
     CAPTURE_PORT,
     OUTPUT_PORT,
@@ -231,7 +252,15 @@ class venc_dev
         bool venc_is_video_session_supported(unsigned long width, unsigned long height);
         bool venc_color_align(OMX_BUFFERHEADERTYPE *buffer, OMX_U32 width,
                         OMX_U32 height);
+        bool venc_get_output_log_flag();
+        int venc_output_log_buffers(const char *buffer_addr, int buffer_len);
+        int venc_input_log_buffers(OMX_BUFFERHEADERTYPE *buffer, int fd, int plane_offset);
+        int venc_extradata_log_buffers(char *buffer_addr);
+        bool venc_get_performance_level(OMX_U32 *perflevel);
+        bool venc_get_vui_timing_info(OMX_U32 *enabled);
+        bool venc_get_peak_bitrate(OMX_U32 *peakbitrate);
 
+        struct venc_debug_cap m_debug;
         OMX_U32 m_nDriver_fd;
         bool m_profile_set;
         bool m_level_set;
@@ -258,10 +287,12 @@ class venc_dev
         class omx_venc *venc_handle;
         OMX_ERRORTYPE allocate_extradata();
         void free_extradata();
+        int append_mbi_extradata(void *, struct msm_vidc_extradata_header*);
         bool handle_extradata(void *, int);
         int venc_set_format(int);
         bool deinterlace_enabled;
     private:
+        OMX_U32                             m_codec;
         struct msm_venc_basecfg             m_sVenc_cfg;
         struct msm_venc_ratectrlcfg         rate_ctrl;
         struct msm_venc_targetbitrate       bitrate;
@@ -273,6 +304,8 @@ class venc_dev
         struct msm_venc_allocatorproperty   m_sInput_buff_property;
         struct msm_venc_allocatorproperty   m_sOutput_buff_property;
         struct msm_venc_sessionqp           session_qp;
+        struct msm_venc_qprange             session_qp_range;
+        struct msm_venc_qprange             session_qp_values;
         struct msm_venc_multiclicecfg       multislice;
         struct msm_venc_entropycfg          entropy;
         struct msm_venc_dbcfg               dbkfilter;
@@ -282,12 +315,18 @@ class venc_dev
         struct msm_venc_video_capability    capability;
         struct msm_venc_idrperiod           idrperiod;
         struct msm_venc_slice_delivery      slice_mode;
+        struct msm_venc_hierlayers          hier_p_layers;
+        struct msm_venc_ltrinfo             ltrinfo;
+        struct msm_venc_perf_level          performance_level;
+        struct msm_venc_vui_timing_info     vui_timing_info;
+        struct msm_venc_peak_bitrate        peak_bitrate;
 
         bool venc_set_profile_level(OMX_U32 eProfile,OMX_U32 eLevel);
         bool venc_set_intra_period(OMX_U32 nPFrames, OMX_U32 nBFrames);
         bool venc_set_target_bitrate(OMX_U32 nTargetBitrate, OMX_U32 config);
         bool venc_set_ratectrl_cfg(OMX_VIDEO_CONTROLRATETYPE eControlRate);
         bool venc_set_session_qp(OMX_U32 i_frame_qp, OMX_U32 p_frame_qp,OMX_U32 b_frame_qp);
+        bool venc_set_session_qp_range(OMX_U32 min_qp, OMX_U32 max_qp);
         bool venc_set_encode_framerate(OMX_U32 encode_framerate, OMX_U32 config);
         bool venc_set_intra_vop_refresh(OMX_BOOL intra_vop_refresh);
         bool venc_set_color_format(OMX_COLOR_FORMATTYPE color_format);
@@ -300,14 +339,20 @@ class venc_dev
         bool venc_set_voptiming_cfg(OMX_U32 nTimeIncRes);
         void venc_config_print();
         bool venc_set_slice_delivery_mode(OMX_U32 enable);
-        bool venc_set_extradata(OMX_U32 extra_data);
+        bool venc_set_extradata(OMX_U32 extra_data, OMX_BOOL enable);
         bool venc_set_idr_period(OMX_U32 nPFrames, OMX_U32 nIDRPeriod);
         bool venc_reconfig_reqbufs();
+        bool venc_set_ltrmode(OMX_U32 enable, OMX_U32 count);
+        bool venc_set_useltr(OMX_U32 frameIdx);
+        bool venc_set_markltr(OMX_U32 frameIdx);
         bool venc_set_inband_video_header(OMX_BOOL enable);
         bool venc_set_au_delimiter(OMX_BOOL enable);
         bool venc_set_vpe_rotation(OMX_S32 rotation_angle);
         bool venc_set_deinterlace(OMX_U32 enable);
-
+        bool venc_set_hier_layers(QOMX_VIDEO_HIERARCHICALCODINGTYPE type, OMX_U32 num_layers);
+        bool venc_set_perf_level(QOMX_VIDEO_PERF_LEVEL ePerfLevel);
+        bool venc_set_vui_timing_info(OMX_BOOL enable);
+        bool venc_set_peak_bitrate(OMX_U32 nPeakBitrate);
 #ifdef MAX_RES_1080P
         OMX_U32 pmem_free();
         OMX_U32 pmem_allocate(OMX_U32 size, OMX_U32 alignment, OMX_U32 count);

@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -225,11 +225,17 @@ class omx_video: public qc_omx_component
 #endif
         virtual bool dev_is_video_session_supported(OMX_U32 width, OMX_U32 height) = 0;
         virtual bool dev_get_capability_ltrcount(OMX_U32 *, OMX_U32 *, OMX_U32 *) = 0;
+        virtual bool dev_get_performance_level(OMX_U32 *) = 0;
+        virtual bool dev_get_vui_timing_info(OMX_U32 *) = 0;
+        virtual bool dev_get_peak_bitrate(OMX_U32 *) = 0;
 #ifdef _ANDROID_ICS_
         void omx_release_meta_buffer(OMX_BUFFERHEADERTYPE *buffer);
 #endif
         virtual bool dev_color_align(OMX_BUFFERHEADERTYPE *buffer, OMX_U32 width,
                         OMX_U32 height) = 0;
+        virtual bool dev_get_output_log_flag() = 0;
+        virtual int dev_output_log_buffers(const char *buffer_addr, int buffer_len) = 0;
+        virtual int dev_extradata_log_buffers(char *buffer_addr) = 0;
         OMX_ERRORTYPE component_role_enum(
                 OMX_HANDLETYPE hComp,
                 OMX_U8 *role,
@@ -581,6 +587,8 @@ class omx_video: public qc_omx_component
         QOMX_VIDEO_CONFIG_LTRUSE_TYPE m_sConfigLTRUse;
         OMX_VIDEO_CONFIG_AVCINTRAPERIOD m_sConfigAVCIDRPeriod;
         OMX_VIDEO_CONFIG_DEINTERLACE m_sConfigDeinterlace;
+        QOMX_VIDEO_HIERARCHICALLAYERS m_sHierLayers;
+        OMX_VIDEO_VP8REFERENCEFRAMETYPE m_sConfigVp8ReferenceFrame;
         OMX_U32 m_sExtraData;
         OMX_U32 m_input_msg_id;
 

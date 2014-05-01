@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -84,9 +84,15 @@ class omx_venc: public omx_video
         bool dev_loaded_start_done(void);
         bool dev_loaded_stop_done(void);
         bool dev_get_capability_ltrcount(OMX_U32 *, OMX_U32 *, OMX_U32 *);
+        bool dev_get_performance_level(OMX_U32 *);
+        bool dev_get_vui_timing_info(OMX_U32 *);
+        bool dev_get_peak_bitrate(OMX_U32 *);
         bool dev_is_video_session_supported(OMX_U32 width, OMX_U32 height);
         bool dev_color_align(OMX_BUFFERHEADERTYPE *buffer, OMX_U32 width,
                         OMX_U32 height);
+        bool dev_get_output_log_flag();
+        int dev_output_log_buffers(const char *buffer_addr, int buffer_len);
+        int dev_extradata_log_buffers(char *buffer);
 };
 
 #endif //__OMX_VENC__H
