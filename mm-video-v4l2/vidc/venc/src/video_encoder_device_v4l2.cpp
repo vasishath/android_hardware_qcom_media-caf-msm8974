@@ -49,7 +49,9 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define ALIGN(x, to_align) ((((unsigned) x) + (to_align - 1)) & ~(to_align - 1))
 #define EXTRADATA_IDX(__num_planes) (__num_planes  - 1)
-
+#define MAXDPB 16
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#define MAX_PROFILE_PARAMS 6
 #define MPEG4_SP_START 0
 #define MPEG4_ASP_START (MPEG4_SP_START + 10)
 #define H263_BP_START 0
@@ -63,106 +65,106 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SZ_1M 0x100000
 
 /* MPEG4 profile and level table*/
-static const unsigned int mpeg4_profile_level_table[][5]= {
-    /*max mb per frame, max mb per sec, max bitrate, level, profile*/
-    {99,1485,64000,OMX_VIDEO_MPEG4Level0,OMX_VIDEO_MPEG4ProfileSimple},
-    {99,1485,64000,OMX_VIDEO_MPEG4Level1,OMX_VIDEO_MPEG4ProfileSimple},
-    {396,5940,128000,OMX_VIDEO_MPEG4Level2,OMX_VIDEO_MPEG4ProfileSimple},
-    {396,11880,384000,OMX_VIDEO_MPEG4Level3,OMX_VIDEO_MPEG4ProfileSimple},
-    {1200,36000,4000000,OMX_VIDEO_MPEG4Level4a,OMX_VIDEO_MPEG4ProfileSimple},
-    {1620,40500,8000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple},
-    {3600,108000,12000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple},
-    {32400,972000,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple},
-    {34560,1036800,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple},
-    {0,0,0,0,0},
+static const unsigned int mpeg4_profile_level_table[][MAX_PROFILE_PARAMS]= {
+    /*max mb per frame, max mb per sec, max bitrate, level, profile, dpbmbs*/
+    {99,1485,64000,OMX_VIDEO_MPEG4Level0,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {99,1485,64000,OMX_VIDEO_MPEG4Level1,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {396,5940,128000,OMX_VIDEO_MPEG4Level2,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {396,11880,384000,OMX_VIDEO_MPEG4Level3,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {1200,36000,4000000,OMX_VIDEO_MPEG4Level4a,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {1620,40500,8000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {3600,108000,12000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {32400,972000,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {34560,1036800,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileSimple,0},
+    {0,0,0,0,0,0},
 
-    {99,1485,128000,OMX_VIDEO_MPEG4Level0,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {99,1485,128000,OMX_VIDEO_MPEG4Level1,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {396,5940,384000,OMX_VIDEO_MPEG4Level2,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {396,11880,768000,OMX_VIDEO_MPEG4Level3,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {792,23760,3000000,OMX_VIDEO_MPEG4Level4,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {1620,48600,8000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {32400,972000,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {34560,1036800,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple},
-    {0,0,0,0,0},
+    {99,1485,128000,OMX_VIDEO_MPEG4Level0,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {99,1485,128000,OMX_VIDEO_MPEG4Level1,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {396,5940,384000,OMX_VIDEO_MPEG4Level2,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {396,11880,768000,OMX_VIDEO_MPEG4Level3,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {792,23760,3000000,OMX_VIDEO_MPEG4Level4,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {1620,48600,8000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {32400,972000,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {34560,1036800,20000000,OMX_VIDEO_MPEG4Level5,OMX_VIDEO_MPEG4ProfileAdvancedSimple,0},
+    {0,0,0,0,0,0},
 };
 
 /* H264 profile and level table*/
-static const unsigned int h264_profile_level_table[][5]= {
-    /*max mb per frame, max mb per sec, max bitrate, level, profile*/
-    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileBaseline},
-    {99,1485,128000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileBaseline},
-    {396,3000,192000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileBaseline},
-    {396,6000,384000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileBaseline},
-    {396,11880,768000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileBaseline},
-    {396,11880,2000000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileBaseline},
-    {792,19800,4000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileBaseline},
-    {1620,20250,4000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileBaseline},
-    {1620,40500,10000000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileBaseline},
-    {3600,108000,14000000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileBaseline},
-    {5120,216000,20000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileBaseline},
-    {8192,245760,20000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileBaseline},
-    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileBaseline},
-    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileBaseline},
-    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileBaseline},
-    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileBaseline},
-    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileBaseline},
-    {0,0,0,0,0},
+static const unsigned int h264_profile_level_table[][MAX_PROFILE_PARAMS]= {
+    /*max mb per frame, max mb per sec, max bitrate, level, profile, dpbmbs*/
+    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileBaseline,396},
+    {99,1485,128000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileBaseline,396},
+    {396,3000,192000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileBaseline,900},
+    {396,6000,384000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileBaseline,2376},
+    {396,11880,768000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileBaseline,2376},
+    {396,11880,2000000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileBaseline,2376},
+    {792,19800,4000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileBaseline,4752},
+    {1620,20250,4000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileBaseline,8100},
+    {1620,40500,10000000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileBaseline,8100},
+    {3600,108000,14000000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileBaseline,18000},
+    {5120,216000,20000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileBaseline,20480},
+    {8192,245760,20000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileBaseline,32768},
+    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileBaseline,32768},
+    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileBaseline,34816},
+    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileBaseline,110400},
+    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileBaseline,184320},
+    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileBaseline,184320},
+    {0,0,0,0,0,0},
 
-    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileHigh},
-    {99,1485,160000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileHigh},
-    {396,3000,240000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileHigh},
-    {396,6000,480000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileHigh},
-    {396,11880,960000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileHigh},
-    {396,11880,2500000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileHigh},
-    {792,19800,5000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileHigh},
-    {1620,20250,5000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileHigh},
-    {1620,40500,12500000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileHigh},
-    {3600,108000,17500000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileHigh},
-    {5120,216000,25000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileHigh},
-    {8192,245760,25000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileHigh},
-    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileHigh},
-    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileHigh},
-    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileHigh},
-    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileHigh},
-    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileHigh},
-    {0,0,0,0,0},
+    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileHigh,396},
+    {99,1485,160000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileHigh,396},
+    {396,3000,240000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileHigh,900},
+    {396,6000,480000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileHigh,2376},
+    {396,11880,960000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileHigh,2376},
+    {396,11880,2500000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileHigh,2376},
+    {792,19800,5000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileHigh,4752},
+    {1620,20250,5000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileHigh,8100},
+    {1620,40500,12500000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileHigh,8100},
+    {3600,108000,17500000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileHigh,18000},
+    {5120,216000,25000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileHigh,20480},
+    {8192,245760,25000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileHigh,32768},
+    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileHigh,32768},
+    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileHigh,34816},
+    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileHigh,110400},
+    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileHigh,184320},
+    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileHigh,184320},
+    {0,0,0,0,0,0},
 
-    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileMain},
-    {99,1485,128000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileMain},
-    {396,3000,192000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileMain},
-    {396,6000,384000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileMain},
-    {396,11880,768000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileMain},
-    {396,11880,2000000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileMain},
-    {792,19800,4000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileMain},
-    {1620,20250,4000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileMain},
-    {1620,40500,10000000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileMain},
-    {3600,108000,14000000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileMain},
-    {5120,216000,20000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileMain},
-    {8192,245760,20000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileMain},
-    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileMain},
-    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileMain},
-    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileMain},
-    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileMain},
-    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileBaseline},
-    {0,0,0,0,0}
+    {99,1485,64000,OMX_VIDEO_AVCLevel1,OMX_VIDEO_AVCProfileMain,396},
+    {99,1485,128000,OMX_VIDEO_AVCLevel1b,OMX_VIDEO_AVCProfileMain,396},
+    {396,3000,192000,OMX_VIDEO_AVCLevel11,OMX_VIDEO_AVCProfileMain,900},
+    {396,6000,384000,OMX_VIDEO_AVCLevel12,OMX_VIDEO_AVCProfileMain,2376},
+    {396,11880,768000,OMX_VIDEO_AVCLevel13,OMX_VIDEO_AVCProfileMain,2376},
+    {396,11880,2000000,OMX_VIDEO_AVCLevel2,OMX_VIDEO_AVCProfileMain,2376},
+    {792,19800,4000000,OMX_VIDEO_AVCLevel21,OMX_VIDEO_AVCProfileMain,4752},
+    {1620,20250,4000000,OMX_VIDEO_AVCLevel22,OMX_VIDEO_AVCProfileMain,8100},
+    {1620,40500,10000000,OMX_VIDEO_AVCLevel3,OMX_VIDEO_AVCProfileMain,8100},
+    {3600,108000,14000000,OMX_VIDEO_AVCLevel31,OMX_VIDEO_AVCProfileMain,18000},
+    {5120,216000,20000000,OMX_VIDEO_AVCLevel32,OMX_VIDEO_AVCProfileMain,20480},
+    {8192,245760,20000000,OMX_VIDEO_AVCLevel4,OMX_VIDEO_AVCProfileMain,32768},
+    {8192,245760,50000000,OMX_VIDEO_AVCLevel41,OMX_VIDEO_AVCProfileMain,32768},
+    {8704,522240,50000000,OMX_VIDEO_AVCLevel42,OMX_VIDEO_AVCProfileMain,34816},
+    {22080,589824,135000000,OMX_VIDEO_AVCLevel5,OMX_VIDEO_AVCProfileMain,110400},
+    {36864,983040,240000000,OMX_VIDEO_AVCLevel51,OMX_VIDEO_AVCProfileMain,184320},
+    {36864,2073600,240000000,OMX_VIDEO_AVCLevel52,OMX_VIDEO_AVCProfileMain,184320},
+    {0,0,0,0,0,0}
 
 };
 
 /* H263 profile and level table*/
-static const unsigned int h263_profile_level_table[][5]= {
-    /*max mb per frame, max mb per sec, max bitrate, level, profile*/
-    {99,1485,64000,OMX_VIDEO_H263Level10,OMX_VIDEO_H263ProfileBaseline},
-    {396,5940,128000,OMX_VIDEO_H263Level20,OMX_VIDEO_H263ProfileBaseline},
-    {396,11880,384000,OMX_VIDEO_H263Level30,OMX_VIDEO_H263ProfileBaseline},
-    {396,11880,2048000,OMX_VIDEO_H263Level40,OMX_VIDEO_H263ProfileBaseline},
-    {99,1485,128000,OMX_VIDEO_H263Level45,OMX_VIDEO_H263ProfileBaseline},
-    {396,19800,4096000,OMX_VIDEO_H263Level50,OMX_VIDEO_H263ProfileBaseline},
-    {810,40500,8192000,OMX_VIDEO_H263Level60,OMX_VIDEO_H263ProfileBaseline},
-    {1620,81000,16384000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline},
-    {32400,972000,20000000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline},
-    {34560,1036800,20000000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline},
-    {0,0,0,0,0}
+static const unsigned int h263_profile_level_table[][MAX_PROFILE_PARAMS]= {
+    /*max mb per frame, max mb per sec, max bitrate, level, profile, dpbmbs*/
+    {99,1485,64000,OMX_VIDEO_H263Level10,OMX_VIDEO_H263ProfileBaseline,0},
+    {396,5940,128000,OMX_VIDEO_H263Level20,OMX_VIDEO_H263ProfileBaseline,0},
+    {396,11880,384000,OMX_VIDEO_H263Level30,OMX_VIDEO_H263ProfileBaseline,0},
+    {396,11880,2048000,OMX_VIDEO_H263Level40,OMX_VIDEO_H263ProfileBaseline,0},
+    {99,1485,128000,OMX_VIDEO_H263Level45,OMX_VIDEO_H263ProfileBaseline,0},
+    {396,19800,4096000,OMX_VIDEO_H263Level50,OMX_VIDEO_H263ProfileBaseline,0},
+    {810,40500,8192000,OMX_VIDEO_H263Level60,OMX_VIDEO_H263ProfileBaseline,0},
+    {1620,81000,16384000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline,0},
+    {32400,972000,20000000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline,0},
+    {34560,1036800,20000000,OMX_VIDEO_H263Level70,OMX_VIDEO_H263ProfileBaseline,0},
+    {0,0,0,0,0,0}
 };
 
 #define Log2(number, power)  { OMX_U32 temp = number; power = 0; while( (0 == (temp & 0x1)) &&  power < 16) { temp >>=0x1; power++; } }
@@ -185,6 +187,7 @@ venc_dev::venc_dev(class omx_venc *venc_class)
     paused = false;
     async_thread_created = false;
     color_format = 0;
+    hw_overload = false;
     pthread_mutex_init(&pause_resume_mlock, NULL);
     pthread_cond_init(&pause_resume_cond, NULL);
     memset(&extradata_info, 0, sizeof(extradata_info));
@@ -379,8 +382,17 @@ void* venc_dev::async_venc_message_thread (void *input)
                     DEBUG_PRINT_ERROR("ERROR: Wrong ioctl message");
                     break;
                 }
-            } else if (dqevent.type == V4L2_EVENT_MSM_VIDC_SYS_ERROR) {
-                DEBUG_PRINT_ERROR("HW Error recieved");
+            } else if (dqevent.type == V4L2_EVENT_MSM_VIDC_HW_OVERLOAD) {
+                DEBUG_PRINT_ERROR("HW Overload received");
+                venc_msg.statuscode = VEN_S_EFAIL;
+                venc_msg.msgcode = VEN_MSG_HW_OVERLOAD;
+
+                if (omx->async_message_process(input,&venc_msg) < 0) {
+                    DEBUG_PRINT_ERROR("ERROR: Wrong ioctl message");
+                    break;
+                }
+            } else if (dqevent.type == V4L2_EVENT_MSM_VIDC_SYS_ERROR){
+                DEBUG_PRINT_ERROR("ERROR: Encoder is in bad state");
                 venc_msg.msgcode = VEN_MSG_INDICATION;
                 venc_msg.statuscode=VEN_S_EFAIL;
 
@@ -1108,7 +1120,7 @@ bool venc_dev::venc_get_buf_req(unsigned long *min_buff_count,
 #endif
         *buff_size = m_sInput_buff_property.datasize;
     } else {
-        int extra_idx = 0;
+        unsigned int extra_idx = 0;
         fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
         fmt.fmt.pix_mp.height = m_sVenc_cfg.dvs_height;
         fmt.fmt.pix_mp.width = m_sVenc_cfg.dvs_width;
@@ -1541,6 +1553,20 @@ bool venc_dev::venc_set_param(void *paramData, OMX_INDEXTYPE index)
 
                 break;
             }
+        case QOMX_IndexParamVideoInitialQp:
+            {
+                QOMX_EXTNINDEX_VIDEO_INITIALQP * initqp =
+                    (QOMX_EXTNINDEX_VIDEO_INITIALQP *)paramData;
+                 if (initqp->bEnableInitQp) {
+                    DEBUG_PRINT_LOW("Enable initial QP: %d", initqp->bEnableInitQp);
+                    if(venc_enable_initial_qp(initqp) == false) {
+                       DEBUG_PRINT_ERROR("ERROR: Failed to enable initial QP");
+                       return OMX_ErrorUnsupportedSetting;
+                     }
+                 } else
+                    DEBUG_PRINT_ERROR("ERROR: setting QOMX_IndexParamVideoEnableInitialQp");
+                break;
+            }
         case OMX_QcomIndexParamVideoQPRange:
             {
                 DEBUG_PRINT_LOW("venc_set_param:OMX_QcomIndexParamVideoQPRange\n");
@@ -1803,7 +1829,12 @@ bool venc_dev::venc_set_config(void *configData, OMX_INDEXTYPE index)
                 OMX_CONFIG_ROTATIONTYPE *config_rotation =
                     reinterpret_cast<OMX_CONFIG_ROTATIONTYPE*>(configData);
                 OMX_U32 nFrameWidth;
-                if (config_rotation && config_rotation->nRotation && deinterlace_enabled) {
+
+                if (!config_rotation) {
+                   return false;
+                }
+
+                if (config_rotation->nRotation && deinterlace_enabled) {
                     DEBUG_PRINT_ERROR("ERROR: Rotation is not supported with deinterlacing");
                     return false;
                 }
@@ -2024,8 +2055,9 @@ unsigned venc_dev::venc_start(void)
     int ret,r;
     DEBUG_PRINT_HIGH("%s(): Check Profile/Level set in driver before start",
             __func__);
+    m_level_set = false;
 
-    if (!venc_set_profile_level(0, 0)) {
+	if (!venc_set_profile_level(0, 0)) {
         DEBUG_PRINT_ERROR("ERROR: %s(): Driver Profile/Level is NOT SET",
                 __func__);
     } else {
@@ -2080,7 +2112,10 @@ void venc_dev::venc_config_print()
             bitrate.target_bitrate, rate_ctrl.rcmode, intra_period.num_pframes);
 
     DEBUG_PRINT_HIGH("ENC_CONFIG: qpI: %ld, qpP: %ld, qpb: %ld",
-            session_qp.iframeqp, session_qp.pframqp,session_qp.bframqp);
+            session_qp.iframeqp, session_qp.pframeqp, session_qp.bframeqp);
+
+    DEBUG_PRINT_HIGH("ENC_CONFIG: Init_qpI: %ld, Init_qpP: %ld, Init_qpb: %ld",
+            init_qp.iframeqp, init_qp.pframeqp, init_qp.bframeqp);
 
     DEBUG_PRINT_HIGH("\nENC_CONFIG: minQP: %d, maxQP: %d",
             session_qp_values.minqp, session_qp_values.maxqp);
@@ -2160,7 +2195,8 @@ bool venc_dev::venc_use_buf(void *buf_addr, unsigned port,unsigned index)
     struct pmem *pmem_tmp;
     struct v4l2_buffer buf;
     struct v4l2_plane plane[VIDEO_MAX_PLANES];
-    int rc = 0, extra_idx;
+    int rc = 0;
+    unsigned int extra_idx;
 
     pmem_tmp = (struct pmem *)buf_addr;
     DEBUG_PRINT_LOW("venc_use_buf:: pmem_tmp = %p", pmem_tmp);
@@ -2452,6 +2488,9 @@ bool venc_dev::venc_empty_buf(void *buffer, void *pmem_data_buf, unsigned index,
 
         if (ret) {
             DEBUG_PRINT_ERROR("Failed to call streamon");
+            if (errno == EBUSY) {
+                hw_overload = true;
+            }
             return false;
         } else {
             streaming[OUTPUT_PORT] = true;
@@ -2469,7 +2508,8 @@ bool venc_dev::venc_fill_buf(void *buffer, void *pmem_data_buf,unsigned index,un
     struct venc_buffer  frameinfo;
     struct v4l2_buffer buf;
     struct v4l2_plane plane[VIDEO_MAX_PLANES];
-    int rc = 0, extra_idx;
+    int rc = 0;
+    unsigned int extra_idx;
     struct OMX_BUFFERHEADERTYPE *bufhdr;
 
     if (buffer == NULL)
@@ -2644,6 +2684,59 @@ bool venc_dev::venc_set_slice_delivery_mode(OMX_U32 enable)
     return true;
 }
 
+bool venc_dev::venc_enable_initial_qp(QOMX_EXTNINDEX_VIDEO_INITIALQP* initqp)
+{
+    int rc;
+    struct v4l2_control control;
+    struct v4l2_ext_control ctrl[4];
+    struct v4l2_ext_controls controls;
+
+    if (((initqp->nQpI >= 1) && (initqp->nQpI <= 51)) &&
+        ((initqp->nQpP >= 1) && (initqp->nQpP <= 51)) &&
+        ((initqp->nQpB >= 1) && (initqp->nQpB <= 51))) {
+        ctrl[0].id = V4L2_CID_MPEG_VIDC_VIDEO_I_FRAME_QP;
+        ctrl[0].value = initqp->nQpI;
+        ctrl[1].id = V4L2_CID_MPEG_VIDC_VIDEO_P_FRAME_QP;
+        ctrl[1].value = initqp->nQpP;
+        ctrl[2].id = V4L2_CID_MPEG_VIDC_VIDEO_B_FRAME_QP;
+        ctrl[2].value = initqp->nQpB;
+        ctrl[3].id = V4L2_CID_MPEG_VIDC_VIDEO_ENABLE_INITIAL_QP;
+        ctrl[3].value = initqp->bEnableInitQp;
+
+        controls.count = 4;
+        controls.ctrl_class = V4L2_CTRL_CLASS_MPEG;
+        controls.controls = ctrl;
+
+        DEBUG_PRINT_LOW("Calling IOCTL set control for id=%x val=%d, id=%x val=%d, id=%x val=%d, id=%x val=%d",
+                        controls.controls[0].id, controls.controls[0].value,
+                        controls.controls[1].id, controls.controls[1].value,
+                        controls.controls[2].id, controls.controls[2].value,
+                        controls.controls[3].id, controls.controls[3].value);
+
+        rc = ioctl(m_nDriver_fd, VIDIOC_S_EXT_CTRLS, &controls);
+        if (rc) {
+            DEBUG_PRINT_ERROR("Failed to set session_qp, errno:%d", errno);
+            return false;
+        }
+
+        init_qp.iframeqp = initqp->nQpI;
+        init_qp.pframeqp = initqp->nQpP;
+        init_qp.bframeqp = initqp->nQpB;
+        init_qp.enableinitqp = initqp->bEnableInitQp;
+
+        DEBUG_PRINT_LOW("Success IOCTL set control for id=%x val=%d, id=%x val=%d, id=%x val=%d, id=%x val=%d",
+                        controls.controls[0].id, controls.controls[0].value,
+                        controls.controls[1].id, controls.controls[1].value,
+                        controls.controls[2].id, controls.controls[2].value,
+                        controls.controls[3].id, controls.controls[3].value);
+        return true;
+    } else {
+        DEBUG_PRINT_ERROR("QP Values are out of valid range (1-51) I: %d, P: %d, B: %d",
+                    initqp->nQpI, initqp->nQpP, initqp->nQpB);
+        return false;
+    }
+}
+
 bool venc_dev::venc_set_session_qp(OMX_U32 i_frame_qp, OMX_U32 p_frame_qp,OMX_U32 b_frame_qp)
 {
     int rc;
@@ -2676,7 +2769,7 @@ bool venc_dev::venc_set_session_qp(OMX_U32 i_frame_qp, OMX_U32 p_frame_qp,OMX_U3
 
     DEBUG_PRINT_LOW("Success IOCTL set control for id=%d, value=%d", control.id, control.value);
 
-    session_qp.pframqp = control.value;
+    session_qp.pframeqp = control.value;
 
     if ((codec_profile.profile == V4L2_MPEG_VIDEO_H264_PROFILE_MAIN) ||
             (codec_profile.profile == V4L2_MPEG_VIDEO_H264_PROFILE_HIGH)) {
@@ -2694,7 +2787,7 @@ bool venc_dev::venc_set_session_qp(OMX_U32 i_frame_qp, OMX_U32 p_frame_qp,OMX_U3
 
         DEBUG_PRINT_LOW("Success IOCTL set control for id=%d, value=%d", control.id, control.value);
 
-        session_qp.bframqp = control.value;
+        session_qp.bframeqp = control.value;
     }
 
     return true;
@@ -3619,7 +3712,9 @@ bool venc_dev::venc_set_ltrmode(OMX_U32 enable, OMX_U32 count)
     struct v4l2_control control;
     struct v4l2_ext_control ctrl[2];
     struct v4l2_ext_controls controls;
-    int rc;
+    unsigned const int *profile_tbl = NULL;
+    OMX_U32 mb_per_frame, mb_per_sec;
+    int rc, new_level, new_profile;
 
     ctrl[0].id = V4L2_CID_MPEG_VIDC_VIDEO_LTRMODE;
     if (enable)
@@ -3662,6 +3757,15 @@ bool venc_dev::venc_set_ltrmode(OMX_U32 enable, OMX_U32 count)
         DEBUG_PRINT_ERROR("ERROR: Request for setting extradata failed");
         return false;
     }
+
+    if (!venc_set_profile_level(0, 0)) {
+        DEBUG_PRINT_ERROR("ERROR: %s(): Driver Profile/Level is NOT SET",
+                __func__);
+    } else {
+        DEBUG_PRINT_HIGH("%s(): Driver Profile[%lu]/Level[%lu] successfully SET",
+                __func__, codec_profile.profile, profile_level.level);
+    }
+
     return true;
 }
 
@@ -4274,16 +4378,27 @@ bool venc_dev::venc_validate_profile_level(OMX_U32 *eProfile, OMX_U32 *eLevel)
         if (mb_per_frame <= (unsigned int)profile_tbl[0]) {
             if (mb_per_sec <= (unsigned int)profile_tbl[1]) {
                 if (m_sVenc_cfg.targetbitrate <= (unsigned int)profile_tbl[2]) {
-                    new_level = (int)profile_tbl[3];
-                    new_profile = (int)profile_tbl[4];
-                    profile_level_found = true;
-                    DEBUG_PRINT_LOW("Appropriate profile/level found %lu/%lu", new_profile, new_level);
-                    break;
+                    if (m_sVenc_cfg.codectype == V4L2_PIX_FMT_H264) {
+                        if ((ltrinfo.count + 2) <= MIN((unsigned int) (profile_tbl[5] / mb_per_frame), MAXDPB)) {
+                            new_level = (int)profile_tbl[3];
+                            new_profile = (int)profile_tbl[4];
+                            profile_level_found = true;
+                            DEBUG_PRINT_LOW("Appropriate H264 profile/level for count: %u is %lu/%lu, maxDPB: %u",
+                                            ltrinfo.count, new_profile, new_level,
+                                            MIN((unsigned int) (profile_tbl[5] / mb_per_frame), MAXDPB));
+                            break;
+                         }
+                    } else {
+                        new_level = (int)profile_tbl[3];
+                        new_profile = (int)profile_tbl[4];
+                        profile_level_found = true;
+                        DEBUG_PRINT_LOW("Appropriate profile/level found %lu/%lu", new_profile, new_level);
+                        break;
+                    }
                 }
             }
         }
-
-        profile_tbl = profile_tbl + 5;
+        profile_tbl = profile_tbl + MAX_PROFILE_PARAMS;
     } while (profile_tbl[0] != 0);
 
     if (profile_level_found != true) {

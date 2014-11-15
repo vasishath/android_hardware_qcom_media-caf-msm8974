@@ -94,6 +94,17 @@ struct OMX_QCOM_PARAM_MEMMAPENTRYTYPE
  */
 #define QOMX_ErrorLTRUseFailed        (OMX_ErrorVendorStartUnused + 1)
 
+/* This error event is used by component to notify OMX client if a new instance
+ * overloads the video hardware.
+ */
+#define OMX_ErrorHardwareOverload     (OMX_ErrorVendorStartUnused + 2)
+
+/* This error event is used by component to notify OMX client if video hardware
+ *  is not able to start encoding/decoding for the last instance sent to it because
+ * it has reached it's maximum limit of concurrent instances.
+ */
+#define OMX_ErrorMaxClientsReached     (OMX_ErrorVendorStartUnused + 3)
+
 #define QOMX_VIDEO_BUFFERFLAG_BFRAME 0x00100000
 
 #define QOMX_VIDEO_BUFFERFLAG_EOSEQ  0x00200000
@@ -276,6 +287,7 @@ enum OMX_QCOM_COLOR_FORMATTYPE
     QOMX_COLOR_FormatYUV420PackedSemiPlanar16m2ka,
     QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
     QOMX_COLOR_FORMATYUV420PackedSemiPlanar32m,
+    QOMX_COLOR_FORMATYUV420PackedSemiPlanar32mMultiView,
     QOMX_COLOR_FormatAndroidOpaque = (OMX_COLOR_FORMATTYPE) OMX_COLOR_FormatVendorStartUnused  + 0x789,
 };
 
@@ -381,6 +393,7 @@ enum OMX_QCOM_EXTN_INDEXTYPE
 
     OMX_QcomIndexEnableSliceDeliveryMode = 0x7F00001F,
 
+    /* "OMX.QCOM.index.param.video.ExtnUserExtraData" */
     OMX_QcomIndexEnableExtnUserData = 0x7F000020,
 
     /*"OMX.QCOM.index.param.video.EnableSmoothStreaming"*/
@@ -445,7 +458,45 @@ enum OMX_QCOM_EXTN_INDEXTYPE
     OMX_QcomIndexParamH264VUITimingInfo = 0x7F000033,
 
     OMX_QcomIndexParamPeakBitrate = 0x7F000034,
+
+    /* Enable InitialQP index */
+    QOMX_IndexParamVideoInitialQp = 0x7F000035,
+
+    /*"OMX.QCOM.index.param.video.CustomBufferSize"*/
+    OMX_QcomIndexParamVideoCustomBufferSize = 0x7F00003E,
 };
+
+/**
+ * Initial QP parameter.  This structure is used to enable
+ * vendor specific extension to let client enable setting
+ * initial QP values to I P B Frames
+ *
+ * STRUCT MEMBERS:
+ *  nSize              : Size of Structure in bytes
+ *  nVersion           : OpenMAX IL specification version information
+ *  nPortIndex         : Index of the port to which this structure applies
+ *  OMX_U32 nQpI       : First Iframe QP
+ *  OMX_U32 nQpP       : First Pframe QP
+ *  OMX_U32 nQpB       : First Bframe QP
+ *  OMX_U32 bEnableInitQp : Bit field indicating which frame type(s) shall
+ *                             use the specified initial QP.
+ *                          Bit 0: Enable initial QP for I/IDR
+ *                                 and use value specified in nInitQpI
+ *                          Bit 1: Enable initial QP for P
+ *                                 and use value specified in nInitQpP
+ *                          Bit 2: Enable initial QP for B
+ *                                 and use value specified in nInitQpB
+ */
+
+typedef struct QOMX_EXTNINDEX_VIDEO_INITIALQP {
+    OMX_U32 nSize;
+    OMX_VERSIONTYPE nVersion;
+    OMX_U32 nPortIndex;
+    OMX_U32 nQpI;
+    OMX_U32 nQpP;
+    OMX_U32 nQpB;
+    OMX_U32 bEnableInitQp;
+} QOMX_EXTNINDEX_VIDEO_INITIALQP;
 
 /**
  * Extension index parameter.  This structure is used to enable
@@ -935,6 +986,11 @@ typedef struct OMX_QCOM_EXTRADATA_BITS_INFO
    OMX_U32 frame_bits;
 } OMX_QCOM_EXTRADATA_BITS_INFO;
 
+typedef struct OMX_QCOM_EXTRADATA_USERDATA {
+   OMX_U32 type;
+   OMX_U32 data[1];
+} OMX_QCOM_EXTRADATA_USERDATA;
+
 typedef struct OMX_QCOM_EXTRADATA_FRAMEINFO
 {
    // common frame meta data. interlace related info removed
@@ -1212,6 +1268,12 @@ typedef struct QOMX_INDEXDOWNSCALAR {
         OMX_BOOL bEnable;
 } QOMX_INDEXDOWNSCALAR;
 
+typedef struct QOMX_VIDEO_CUSTOM_BUFFERSIZE {
+        OMX_U32 nSize;
+        OMX_VERSIONTYPE nVersion;
+        OMX_U32 nPortIndex;
+        OMX_U32 nBufferSize;
+} QOMX_VIDEO_CUSTOM_BUFFERSIZE;
 
 #define OMX_QCOM_INDEX_PARAM_VIDEO_SYNCFRAMEDECODINGMODE "OMX.QCOM.index.param.video.SyncFrameDecodingMode"
 #define OMX_QCOM_INDEX_PARAM_INDEXEXTRADATA "OMX.QCOM.index.param.IndexExtraData"
@@ -1219,6 +1281,7 @@ typedef struct QOMX_INDEXDOWNSCALAR {
 #define OMX_QCOM_INDEX_PARAM_VIDEO_FRAMEPACKING_EXTRADATA "OMX.QCOM.index.param.video.FramePackingExtradata"
 #define OMX_QCOM_INDEX_PARAM_VIDEO_QP_EXTRADATA "OMX.QCOM.index.param.video.QPExtradata"
 #define OMX_QCOM_INDEX_PARAM_VIDEO_INPUTBITSINFO_EXTRADATA "OMX.QCOM.index.param.video.InputBitsInfoExtradata"
+#define OMX_QCOM_INDEX_PARAM_VIDEO_EXTNUSER_EXTRADATA "OMX.QCOM.index.param.video.ExtnUserExtraData"
 #define OMX_QCOM_INDEX_CONFIG_VIDEO_FRAMEPACKING_INFO "OMX.QCOM.index.config.video.FramePackingInfo"
 
 typedef enum {

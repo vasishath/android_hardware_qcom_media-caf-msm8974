@@ -67,6 +67,7 @@ status_t DashPlayerDriver::setUID(uid_t uid) {
 }
 
 status_t DashPlayerDriver::setDataSource(
+         const sp<IMediaHTTPService> & /*httpService*/,
         const char *url, const KeyedVector<String8, String8> *headers) {
     CHECK_EQ((int)mState, (int)UNINITIALIZED);
 
@@ -273,12 +274,16 @@ status_t DashPlayerDriver::reset() {
     return OK;
 }
 
-status_t DashPlayerDriver::setLooping(int loop) {
+status_t DashPlayerDriver::setLooping(int /*loop*/) {
     return INVALID_OPERATION;
 }
 
 player_type DashPlayerDriver::playerType() {
     return NU_PLAYER;
+}
+
+void DashPlayerDriver::setQCTimedTextListener(const bool val) {
+  mPlayer->setQCTimedTextListener(val);
 }
 
 status_t DashPlayerDriver::invoke(const Parcel &request, Parcel *reply) {
@@ -363,12 +368,42 @@ status_t DashPlayerDriver::invoke(const Parcel &request, Parcel *reply) {
           break;
        }
 
+       case KEY_DASH_RESUME_EVENT:
+       {
+          ALOGV("calling KEY_DASH_RESUME_EVENT pause()");
+          ret = start();
+          int32_t val = (ret == OK)? 1:0;
+          reply->setDataPosition(0);
+          reply->writeInt32(val);
+          break;
+       }
+
+       case KEY_QCTIMEDTEXT_LISTENER:
+       {
+         ALOGV("calling KEY_QCTIMEDTEXT_LISTENER");
+
+         int32_t val = 0;
+         ret = request.readInt32(&val);
+         if (ret != OK)
+         {
+           ALOGE("Invoke KEY_QCTIMEDTEXT_LISTENER: invalid val");
+         }
+         else
+         {
+           bool bVal = (val == 1)? true:false;
+           setQCTimedTextListener(bVal);
+           reply->setDataPosition(0);
+           reply->writeInt32(1);
+         }
+         break;
+       }
+
        case INVOKE_ID_GET_TRACK_INFO:
        {
          // Ignore the invoke call for INVOKE_ID_GET_TRACK_INFO with success return code
          // to avoid mediaplayer java exception
-         ALOGE("Ignore requested method INVOKE_ID_GET_TRACK_INFO to invoke");
-         ret = OK;
+         ALOGV("Calling INVOKE_ID_GET_TRACK_INFO to invoke");
+         ret = getParameter(methodId,reply);
          break;
        }
 
@@ -408,7 +443,7 @@ status_t DashPlayerDriver::getParameter(int key, Parcel *reply) {
 }
 
 status_t DashPlayerDriver::getMetadata(
-        const media::Metadata::Filter& ids, Parcel *records) {
+        const media::Metadata::Filter& /*ids*/, Parcel * /*records*/) {
     return INVALID_OPERATION;
 }
 
@@ -423,7 +458,7 @@ void DashPlayerDriver::notifySetSurfaceComplete() {
     Mutex::Autolock autoLock(mLock);
     CHECK(mSetSurfaceInProgress);
     mSetSurfaceInProgress = false;
-    ALOGV("DashPlayerDriver::notifySetSurfaceComplete done");
+    ALOGE("DashPlayerDriver::notifySetSurfaceComplete done");
     mCondition.broadcast();
 }
 

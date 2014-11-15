@@ -202,6 +202,8 @@ class VideoHeap : public MemoryHeapBase
             sizeof(OMX_QCOM_EXTRADATA_QP) + 3)&(~3))
 #define OMX_BITSINFO_EXTRADATA_SIZE ((sizeof(OMX_OTHER_EXTRADATATYPE) +\
             sizeof(OMX_QCOM_EXTRADATA_BITS_INFO) + 3)&(~3))
+#define OMX_USERDATA_EXTRADATA_SIZE ((sizeof(OMX_OTHER_EXTRADATATYPE) +\
+            + 3)&(~3))
 
 //  Define next macro with required values to enable default extradata,
 //    VDEC_EXTRADATA_MB_ERROR_MAP
@@ -496,6 +498,7 @@ class omx_vdec: public qc_omx_component
             OMX_COMPONENT_GENERATE_INFO_PORT_RECONFIG = 0x15,
             OMX_COMPONENT_GENERATE_INFO_FIELD_DROPPED = 0x16,
             OMX_COMPONENT_GENERATE_UNSUPPORTED_SETTING = 0x17,
+            OMX_COMPONENT_GENERATE_HARDWARE_OVERLOAD = 0x18,
         };
 
         enum vc1_profile_type {
@@ -713,7 +716,7 @@ class omx_vdec: public qc_omx_component
 
         inline void omx_report_error () {
             if (m_cb.EventHandler && !m_error_propogated) {
-                ALOGE("\nERROR: Sending OMX_EventError to Client");
+                DEBUG_PRINT_ERROR("ERROR: Sending OMX_ErrorHardware to Client");
                 m_error_propogated = true;
                 m_cb.EventHandler(&m_cmp,m_app_data,
                         OMX_EventError,OMX_ErrorHardware,0,NULL);
@@ -723,12 +726,22 @@ class omx_vdec: public qc_omx_component
         inline void omx_report_unsupported_setting () {
             if (m_cb.EventHandler && !m_error_propogated) {
                 DEBUG_PRINT_ERROR(
-                        "\nERROR: Sending OMX_ErrorUnsupportedSetting to Client");
+                        "ERROR: Sending OMX_ErrorUnsupportedSetting to Client");
                 m_error_propogated = true;
-                m_cb.EventHandler(&m_cmp,m_app_data,
-                        OMX_EventError,OMX_ErrorUnsupportedSetting,0,NULL);
+                m_cb.EventHandler(&m_cmp, m_app_data,
+                        OMX_EventError, OMX_ErrorUnsupportedSetting, 0, NULL);
             }
         }
+        inline void omx_report_hw_overload () {
+            if (m_cb.EventHandler && !m_error_propogated) {
+                DEBUG_PRINT_ERROR(
+                        "ERROR: Sending OMX_ErrorInsufficientResources to Client");
+                m_error_propogated = true;
+                m_cb.EventHandler(&m_cmp, m_app_data,
+                        OMX_EventError, OMX_ErrorInsufficientResources, 0, NULL);
+            }
+        }
+
 #ifdef _ANDROID_
         OMX_ERRORTYPE createDivxDrmContext();
 #endif //_ANDROID_
@@ -917,6 +930,9 @@ class omx_vdec: public qc_omx_component
         int prev_n_filled_len;
         bool is_down_scalar_enabled;
 #endif
+        struct custom_buffersize {
+            OMX_U32 input_buffersize;
+        } m_custom_buffersize;
         bool m_power_hinted;
         bool is_q6_platform;
         OMX_ERRORTYPE power_module_register();
@@ -935,6 +951,7 @@ class omx_vdec: public qc_omx_component
         OMX_U32 m_smoothstreaming_width;
         OMX_U32 m_smoothstreaming_height;
         OMX_ERRORTYPE enable_smoothstreaming();
+        OMX_ERRORTYPE enable_adaptive_playback(unsigned long width, unsigned long height);
 
         unsigned int m_fill_output_msg;
         bool client_set_fps;
@@ -995,6 +1012,31 @@ class omx_vdec: public qc_omx_component
         void send_codec_config();
 #endif
         OMX_TICKS m_last_rendered_TS;
+
+        static OMX_COLOR_FORMATTYPE getPreferredColorFormatNonSurfaceMode(OMX_U32 index) {
+            //On Android, we default to standard YUV formats for non-surface use-cases
+            //where apps prefer known color formats.
+            OMX_COLOR_FORMATTYPE formatsNonSurfaceMode[] = {
+                [0] = OMX_COLOR_FormatYUV420SemiPlanar,
+                [1] = OMX_COLOR_FormatYUV420Planar,
+                [2] = (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FORMATYUV420PackedSemiPlanar32m,
+                [3] = (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FORMATYUV420PackedSemiPlanar32mMultiView,
+            };
+            return (index < sizeof(formatsNonSurfaceMode) / sizeof(OMX_COLOR_FORMATTYPE)) ?
+                formatsNonSurfaceMode[index] : OMX_COLOR_FormatMax;
+        }
+
+        static OMX_COLOR_FORMATTYPE getPreferredColorFormatDefaultMode(OMX_U32 index) {
+            //for surface mode (normal playback), advertise native/accelerated formats first
+            OMX_COLOR_FORMATTYPE formatsDefault[] = {
+                [0] = (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FORMATYUV420PackedSemiPlanar32m,
+                [1] = OMX_COLOR_FormatYUV420Planar,
+                [2] = OMX_COLOR_FormatYUV420SemiPlanar,
+                [3] = (OMX_COLOR_FORMATTYPE)QOMX_COLOR_FORMATYUV420PackedSemiPlanar32mMultiView,
+            };
+            return (index < sizeof(formatsDefault) / sizeof(OMX_COLOR_FORMATTYPE)) ?
+                formatsDefault[index] : OMX_COLOR_FormatMax;
+        }
 };
 
 #ifdef _MSM8974_

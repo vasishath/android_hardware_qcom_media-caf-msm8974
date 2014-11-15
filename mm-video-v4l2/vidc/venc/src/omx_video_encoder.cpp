@@ -344,6 +344,8 @@ OMX_ERRORTYPE omx_venc::component_init(OMX_STRING role)
     OMX_INIT_STRUCT(&m_sOutBufSupplier, OMX_PARAM_BUFFERSUPPLIERTYPE);
     m_sOutBufSupplier.nPortIndex = (OMX_U32) PORT_INDEX_OUT;
 
+    OMX_INIT_STRUCT(&m_sParamInitqp, QOMX_EXTNINDEX_VIDEO_INITIALQP);
+    m_sParamInitqp.nPortIndex = (OMX_U32) PORT_INDEX_OUT;
 
     // mp4 specific init
     OMX_INIT_STRUCT(&m_sParamMPEG4, OMX_VIDEO_PARAM_MPEG4TYPE);
@@ -930,6 +932,7 @@ OMX_ERRORTYPE  omx_venc::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                     }
                     m_sSessionQuantization.nQpI = session_qp->nQpI;
                     m_sSessionQuantization.nQpP = session_qp->nQpP;
+                    m_sSessionQuantization.nQpB = session_qp->nQpB;
                 } else {
                     DEBUG_PRINT_ERROR("ERROR: Unsupported port Index for Session QP setting");
                     eRet = OMX_ErrorBadPortIndex;
@@ -1274,6 +1277,18 @@ OMX_ERRORTYPE  omx_venc::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                     DEBUG_PRINT_ERROR("ERROR: Setting peak bitrate");
                     return OMX_ErrorUnsupportedSetting;
                 }
+                break;
+            }
+        case QOMX_IndexParamVideoInitialQp:
+            {
+                if(!handle->venc_set_param(paramData,
+                            (OMX_INDEXTYPE)QOMX_IndexParamVideoInitialQp)) {
+                    DEBUG_PRINT_ERROR("%s: %s",
+                            "QOMX_IndexParamVideoEnableInitialQp",
+                            "request to Enable initial QP failed.");
+                    return OMX_ErrorUnsupportedSetting;
+                }
+                memcpy(&m_sParamInitqp, paramData, sizeof(m_sParamInitqp));
                 break;
             }
         case OMX_IndexParamVideoSliceFMO:
@@ -1726,7 +1741,10 @@ bool omx_venc::dev_free_buf(void *buf_addr,unsigned port)
 
 bool omx_venc::dev_empty_buf(void *buffer, void *pmem_data_buf,unsigned index,unsigned fd)
 {
-    return  handle->venc_empty_buf(buffer, pmem_data_buf,index,fd);
+    bool bret = false;
+    bret = handle->venc_empty_buf(buffer, pmem_data_buf,index,fd);
+    hw_overload = handle->hw_overload;
+    return bret;
 }
 
 bool omx_venc::dev_fill_buf(void *buffer, void *pmem_data_buf,unsigned index,unsigned fd)
@@ -1863,7 +1881,11 @@ int omx_venc::async_message_process (void *context, void* message)
     if (m_sVenc_msg->statuscode != VEN_S_SUCCESS) {
         DEBUG_PRINT_ERROR("ERROR: async_msg_process() - Error statuscode = %lu",
                 m_sVenc_msg->statuscode);
-        omx->omx_report_error();
+        if(m_sVenc_msg->msgcode == VEN_MSG_HW_OVERLOAD) {
+            omx->omx_report_hw_overload();
+        } else {
+            omx->omx_report_error();
+        }
     }
 
     DEBUG_PRINT_LOW("omx_venc::async_message_process- msgcode = %lu",
