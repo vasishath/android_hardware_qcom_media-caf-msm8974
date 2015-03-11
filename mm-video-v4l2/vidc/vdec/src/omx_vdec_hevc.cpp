@@ -721,6 +721,11 @@ int release_buffers(omx_vdec* obj, enum vdec_buffer buffer_type)
         bufreq.count = 0;
         bufreq.type=V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
         rc = ioctl(obj->drv_ctx.video_driver_fd,VIDIOC_REQBUFS, &bufreq);
+    } else if (buffer_type == VDEC_BUFFER_TYPE_INPUT) {
+        bufreq.memory = V4L2_MEMORY_USERPTR;
+        bufreq.count = 0;
+        bufreq.type=V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+        rc = ioctl(obj->drv_ctx.video_driver_fd,VIDIOC_REQBUFS, &bufreq);
     }
     return rc;
 }
@@ -2808,8 +2813,14 @@ OMX_ERRORTYPE  omx_vdec::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                             if (ret) {
                                 DEBUG_PRINT_ERROR("Set Resolution failed");
                                 eRet = OMX_ErrorUnsupportedSetting;
-                            } else
+                            } else {
+                                eRet = get_buffer_req(&drv_ctx.ip_buf);
+                                if (ret)
+                                    DEBUG_PRINT_ERROR("%s:Requesting buffer requirements failed for input port",__FUNCTION__);
                                 eRet = get_buffer_req(&drv_ctx.op_buf);
+                                if (ret)
+                                    DEBUG_PRINT_ERROR("%s:Requesting buffer requirements failed for output port",__FUNCTION__);
+                            }
                         }
                     } else if (portDefn->nBufferCountActual >= drv_ctx.ip_buf.mincount
                             || portDefn->nBufferSize != drv_ctx.ip_buf.buffer_size) {
@@ -4848,6 +4859,7 @@ OMX_ERRORTYPE  omx_vdec::free_buffer(OMX_IN OMX_HANDLETYPE         hComp,
             /*Free the Buffer Header*/
             if (release_input_done()) {
                 DEBUG_PRINT_HIGH("ALL input buffers are freed/released");
+                release_buffers(this, VDEC_BUFFER_TYPE_INPUT);
                 free_input_buffer_header();
             }
         } else {
@@ -4874,6 +4886,7 @@ OMX_ERRORTYPE  omx_vdec::free_buffer(OMX_IN OMX_HANDLETYPE         hComp,
             client_buffers.free_output_buffer (buffer);
 
             if (release_output_done()) {
+                release_buffers(this, VDEC_BUFFER_TYPE_OUTPUT);
                 free_output_buffer_header();
             }
         } else {
@@ -5263,6 +5276,7 @@ OMX_ERRORTYPE  omx_vdec::empty_this_buffer_proxy(OMX_IN OMX_HANDLETYPE         h
 OMX_ERRORTYPE  omx_vdec::fill_this_buffer(OMX_IN OMX_HANDLETYPE  hComp,
         OMX_IN OMX_BUFFERHEADERTYPE* buffer)
 {
+    unsigned nPortIndex = buffer - client_buffers.get_il_buf_hdr();
 
     if (m_state == OMX_StateInvalid) {
         DEBUG_PRINT_ERROR("FTB in Invalid State");
@@ -5275,7 +5289,9 @@ OMX_ERRORTYPE  omx_vdec::fill_this_buffer(OMX_IN OMX_HANDLETYPE  hComp,
     }
 
     if (buffer == NULL ||
-            ((buffer - client_buffers.get_il_buf_hdr()) >= drv_ctx.op_buf.actualcount)) {
+            (nPortIndex >= drv_ctx.op_buf.actualcount)) {
+        DEBUG_PRINT_ERROR("FTB: ERROR: invalid buffer index,  nPortIndex %u bufCount %u",
+            nPortIndex, drv_ctx.op_buf.actualcount);
         return OMX_ErrorBadParameter;
     }
 
@@ -5316,8 +5332,11 @@ OMX_ERRORTYPE  omx_vdec::fill_this_buffer_proxy(
 
     nPortIndex = buffer-((OMX_BUFFERHEADERTYPE *)client_buffers.get_il_buf_hdr());
 
-    if (bufferAdd == NULL || nPortIndex > drv_ctx.op_buf.actualcount)
+    if (bufferAdd == NULL || nPortIndex > drv_ctx.op_buf.actualcount) {
+        DEBUG_PRINT_ERROR("FTBProxy: ERROR: invalid buffer index, nPortIndex %u bufCount %u",
+            nPortIndex, drv_ctx.op_buf.actualcount);
         return OMX_ErrorBadParameter;
+    }
 
     DEBUG_PRINT_LOW("FTBProxy: bufhdr = %p, bufhdr->pBuffer = %p",
             bufferAdd, bufferAdd->pBuffer);
