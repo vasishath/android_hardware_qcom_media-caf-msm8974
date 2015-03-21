@@ -2849,8 +2849,10 @@ OMX_ERRORTYPE  omx_vdec::get_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                                     // Distinguish non-surface mode from normal playback use-case based on
                                     // usage hinted via "OMX.google.android.index.useAndroidNativeBuffer2"
                                     // For non-android, use the default list
+                                    // Also use default format-list if FLEXIBLE YUV is supported,
+                                    // as the client negotiates the standard color-format if it needs to
                                     bool useNonSurfaceMode = false;
-#if _ANDROID_
+#if defined(_ANDROID_) && !defined(FLEXYUV_SUPPORTED)
                                     useNonSurfaceMode = (m_enable_android_native_buffers == OMX_FALSE);
 #endif
                                     portFmt->eColorFormat = useNonSurfaceMode ?
@@ -2989,6 +2991,14 @@ OMX_ERRORTYPE  omx_vdec::get_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                                         }
                                     }
                                     break;
+#endif
+
+#ifdef FLEXYUV_SUPPORTED
+        case OMX_QcomIndexFlexibleYUVDescription: {
+                DEBUG_PRINT_LOW("get_parameter: describeColorFormat");
+                eRet = describeColorFormat(paramData);
+                break;
+            }
 #endif
 
         default: {
@@ -3638,6 +3648,7 @@ OMX_ERRORTYPE  omx_vdec::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                                            if (enableNativeBuffers) {
                                                m_enable_android_native_buffers = enableNativeBuffers->enable;
                                             }
+#if !defined(FLEXYUV_SUPPORTED)
                                             if (m_enable_android_native_buffers) {
                                                // Use the most-preferred-native-color-format as surface-mode is hinted here
                                                if(!client_buffers.set_color_format(getPreferredColorFormatDefaultMode(0))) {
@@ -3645,6 +3656,7 @@ OMX_ERRORTYPE  omx_vdec::set_parameter(OMX_IN OMX_HANDLETYPE     hComp,
                                                    eRet = OMX_ErrorUnsupportedSetting;
                                                }
                                            }
+#endif
                                        }
                                        break;
         case OMX_GoogleAndroidIndexUseAndroidNativeBuffer: {
@@ -4174,6 +4186,11 @@ OMX_ERRORTYPE  omx_vdec::get_extension_index(OMX_IN OMX_HANDLETYPE      hComp,
 #ifdef ADAPTIVE_PLAYBACK_SUPPORTED
     else if (extn_equals(paramName, "OMX.google.android.index.prepareForAdaptivePlayback")) {
         *indexType = (OMX_INDEXTYPE)OMX_QcomIndexParamVideoAdaptivePlaybackMode;
+    }
+#endif
+#ifdef FLEXYUV_SUPPORTED
+    else if (extn_equals(paramName,"OMX.google.android.index.describeColorFormat")) {
+        *indexType = (OMX_INDEXTYPE)OMX_QcomIndexFlexibleYUVDescription;
     }
 #endif
     else {
@@ -9918,3 +9935,79 @@ void omx_vdec::send_codec_config() {
     }
 }
 #endif
+
+//static
+OMX_ERRORTYPE omx_vdec::describeColorFormat(OMX_PTR pParam) {
+
+#ifndef FLEXYUV_SUPPORTED
+    (void)pParam;
+    return OMX_ErrorUndefined;
+#else
+
+    if (pParam == NULL) {
+        DEBUG_PRINT_ERROR("describeColorFormat: invalid params");
+        return OMX_ErrorBadParameter;
+    }
+
+    DescribeColorFormatParams *params = (DescribeColorFormatParams*)pParam;
+
+    MediaImage *img = &(params->sMediaImage);
+    switch(params->eColorFormat) {
+        case QOMX_COLOR_FORMATYUV420PackedSemiPlanar32m:
+        {
+            img->mType = MediaImage::MEDIA_IMAGE_TYPE_YUV;
+            img->mNumPlanes = 3;
+            // mWidth and mHeight represent the W x H of the largest plane
+            // In our case, this happens to be the Stride x Scanlines of Y plane
+            img->mWidth = params->nFrameWidth;
+            img->mHeight = params->nFrameHeight;
+            size_t planeWidth = VENUS_Y_STRIDE(COLOR_FMT_NV12, params->nFrameWidth);
+            size_t planeHeight = VENUS_Y_SCANLINES(COLOR_FMT_NV12, params->nFrameHeight);
+            img->mBitDepth = 8;
+            //Plane 0 (Y)
+            img->mPlane[MediaImage::Y].mOffset = 0;
+            img->mPlane[MediaImage::Y].mColInc = 1;
+            img->mPlane[MediaImage::Y].mRowInc = planeWidth; //same as stride
+            img->mPlane[MediaImage::Y].mHorizSubsampling = 1;
+            img->mPlane[MediaImage::Y].mVertSubsampling = 1;
+            //Plane 1 (U)
+            img->mPlane[MediaImage::U].mOffset = planeWidth * planeHeight;
+            img->mPlane[MediaImage::U].mColInc = 2;           //interleaved UV
+            img->mPlane[MediaImage::U].mRowInc =
+                    VENUS_UV_STRIDE(COLOR_FMT_NV12, params->nFrameWidth);
+            img->mPlane[MediaImage::U].mHorizSubsampling = 2;
+            img->mPlane[MediaImage::U].mVertSubsampling = 2;
+            //Plane 2 (V)
+            img->mPlane[MediaImage::V].mOffset = planeWidth * planeHeight + 1;
+            img->mPlane[MediaImage::V].mColInc = 2;           //interleaved UV
+            img->mPlane[MediaImage::V].mRowInc =
+                    VENUS_UV_STRIDE(COLOR_FMT_NV12, params->nFrameWidth);
+            img->mPlane[MediaImage::V].mHorizSubsampling = 2;
+            img->mPlane[MediaImage::V].mVertSubsampling = 2;
+            break;
+        }
+
+        case OMX_COLOR_FormatYUV420Planar:
+        case OMX_COLOR_FormatYUV420SemiPlanar:
+            // We need not describe the standard OMX linear formats as these are
+            // understood by client. Fail this deliberately to let client fill-in
+            return OMX_ErrorUnsupportedSetting;
+
+        default:
+            // Rest all formats which are non-linear cannot be described
+            DEBUG_PRINT_LOW("color-format %x is not flexible", params->eColorFormat);
+            img->mType = MediaImage::MEDIA_IMAGE_TYPE_UNKNOWN;
+            return OMX_ErrorNone;
+    };
+
+    DEBUG_PRINT_LOW("NOTE: Describe color format : %x", params->eColorFormat);
+    DEBUG_PRINT_LOW("  FrameWidth x FrameHeight : %d x %d", params->nFrameWidth, params->nFrameHeight);
+    DEBUG_PRINT_LOW("  YWidth x YHeight : %d x %d", img->mWidth, img->mHeight);
+    for (size_t i = 0; i < img->mNumPlanes; ++i) {
+        DEBUG_PRINT_LOW("    Plane[%d] : offset=%d / xStep=%d / yStep = %d",
+                i, img->mPlane[i].mOffset, img->mPlane[i].mColInc, img->mPlane[i].mRowInc);
+    }
+    return OMX_ErrorNone;
+#endif //FLEXYUV_SUPPORTED
+}
+
