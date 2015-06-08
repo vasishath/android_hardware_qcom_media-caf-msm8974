@@ -32,15 +32,15 @@ LOCAL_STATIC_LIBRARIES :=       \
     libstagefright_rtsp         \
 
 LOCAL_C_INCLUDES := \
-        $(TOP)/frameworks/av/media/libstagefright/timedtext           \
+        $(TOP)/frameworks/av-caf/media/libstagefright/timedtext           \
 	$(TOP)/frameworks/native/include/media/hardware               \
 	$(TOP)/frameworks/native/include/media/openmax                \
-	$(TOP)/frameworks/av/media/libstagefright/httplive            \
-	$(TOP)/frameworks/av/media/libmediaplayerservice/nuplayer     \
-	$(TOP)/frameworks/av/media/libmediaplayerservice              \
-	$(TOP)/frameworks/av/media/libstagefright/include             \
-	$(TOP)/frameworks/av/media/libstagefright/mpeg2ts             \
-	$(TOP)/frameworks/av/media/libstagefright/rtsp                \
+	$(TOP)/frameworks/av-caf/media/libstagefright/httplive            \
+	$(TOP)/frameworks/av-caf/media/libmediaplayerservice/nuplayer     \
+	$(TOP)/frameworks/av-caf/media/libmediaplayerservice              \
+	$(TOP)/frameworks/av-caf/media/libstagefright/include             \
+	$(TOP)/frameworks/av-caf/media/libstagefright/mpeg2ts             \
+	$(TOP)/frameworks/av-caf/media/libstagefright/rtsp                \
 	$(TOP)/hardware/qcom/media-caf-bfam/mm-core/inc                        \
 	$(TOP)/hardware/qcom/display-caf-bfam/libgralloc                       \
 	$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include

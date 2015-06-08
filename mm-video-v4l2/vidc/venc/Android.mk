@@ -88,7 +88,7 @@ libmm-venc-inc      += frameworks/native/include/media/hardware
 libmm-venc-inc      += frameworks/native/include/media/openmax
 libmm-venc-inc      += hardware/qcom/media-caf-bfam/libc2dcolorconvert
 libmm-venc-inc      += hardware/qcom/display-caf-bfam/libcopybit
-libmm-venc-inc      += frameworks/av/include/media/stagefright
+libmm-venc-inc      += frameworks/av-caf/include/media/stagefright
 libmm-venc-inc      += $(TARGET_OUT_HEADERS)/qcom/display-caf-bfam/
 libmm-venc-inc      += $(venc-inc)
 

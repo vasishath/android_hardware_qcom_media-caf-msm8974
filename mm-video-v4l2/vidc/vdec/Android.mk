@@ -112,7 +112,7 @@ libmm-vdec-inc          += $(vdec-inc)
 libmm-vdec-inc          += hardware/qcom/display-caf-bfam/libqdutils
 libmm-vdec-inc      += hardware/qcom/media-caf-bfam/libc2dcolorconvert
 libmm-vdec-inc      += hardware/qcom/display-caf-bfam/libcopybit
-libmm-vdec-inc      += frameworks/av/include/media/stagefright
+libmm-vdec-inc      += frameworks/av-caf/include/media/stagefright
 libmm-vdec-inc      += $(TARGET_OUT_HEADERS)/mm-video/SwVdec
 libmm-vdec-inc      += $(TARGET_OUT_HEADERS)/qcom/display-caf-bfam/
 
