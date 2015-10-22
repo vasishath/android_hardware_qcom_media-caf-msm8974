@@ -126,6 +126,7 @@ extern "C" {
 #define Log2(number, power)  { OMX_U32 temp = number; power = 0; while( (0 == (temp & 0x1)) &&  power < 16) { temp >>=0x1; power++; } }
 #define Q16ToFraction(q,num,den) { OMX_U32 power; Log2(q,power);  num = q >> power; den = 0x1 << (16 - power); }
 #define EXTRADATA_IDX(__num_planes) (__num_planes  - 1)
+#define ALIGN(x, to_align) ((((unsigned) x) + (to_align - 1)) & ~(to_align - 1))
 
 #define DEFAULT_EXTRADATA (OMX_INTERLACE_EXTRADATA)
 #define DEFAULT_CONCEAL_COLOR "32896" //0x8080, black by default
@@ -289,7 +290,7 @@ void* async_message_thread (void *input)
     return NULL;
 }
 
-void* message_thread(void *input)
+void* dec_message_thread(void *input)
 {
     omx_vdec* omx = reinterpret_cast<omx_vdec*>(input);
     unsigned char id;
@@ -1552,14 +1553,14 @@ OMX_ERRORTYPE omx_vdec::component_init(OMX_STRING role)
     int fds[2];
     int r,ret=0;
     bool codec_ambiguous = false;
-    OMX_STRING device_name = (OMX_STRING)"/dev/video/venus_dec";
+    OMX_STRING device_name = (OMX_STRING)"/dev/video32";
     char property_value[PROPERTY_VALUE_MAX] = {0};
 
 #ifdef _ANDROID_
     char platform_name[PROPERTY_VALUE_MAX];
     property_get("ro.board.platform", platform_name, "0");
     if (!strncmp(platform_name, "msm8610", 7)) {
-        device_name = (OMX_STRING)"/dev/video/q6_dec";
+        device_name = (OMX_STRING)"/dev/video34";
         is_q6_platform = true;
         maxSmoothStreamingWidth = 1280;
         maxSmoothStreamingHeight = 720;
@@ -1580,8 +1581,8 @@ OMX_ERRORTYPE omx_vdec::component_init(OMX_STRING role)
 
     drv_ctx.video_driver_fd = open(device_name, O_RDWR);
 
-    DEBUG_PRINT_HIGH("omx_vdec::component_init(): Open returned fd %d",
-			drv_ctx.video_driver_fd);
+    DEBUG_PRINT_HIGH("omx_vdec::component_init(): Open  device %s returned fd %d",
+			device_name, drv_ctx.video_driver_fd);
 
     if (drv_ctx.video_driver_fd == 0) {
         DEBUG_PRINT_ERROR("omx_vdec_msm8974 :: Got fd as 0 for msm_vidc_dec, Opening again");
@@ -1932,10 +1933,10 @@ OMX_ERRORTYPE omx_vdec::component_init(OMX_STRING role)
             m_pipe_in = fds[0];
             m_pipe_out = fds[1];
             msg_thread_created = true;
-            r = pthread_create(&msg_thread_id,0,message_thread,this);
+            r = pthread_create(&msg_thread_id,0, dec_message_thread,this);
 
             if (r < 0) {
-                DEBUG_PRINT_ERROR("component_init(): message_thread creation failed");
+                DEBUG_PRINT_ERROR("component_init(): dec_message_thread creation failed");
                 msg_thread_created = false;
                 eRet = OMX_ErrorInsufficientResources;
             }
@@ -1948,6 +1949,13 @@ OMX_ERRORTYPE omx_vdec::component_init(OMX_STRING role)
         DEBUG_PRINT_HIGH("omx_vdec::component_init() success");
     }
     //memset(&h264_mv_buff,0,sizeof(struct h264_mv_buffer));
+    control.id = V4L2_CID_MPEG_VIDC_VIDEO_PRIORITY;
+    control.value = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_DISABLE;
+
+    if (ioctl(drv_ctx.video_driver_fd, VIDIOC_S_CTRL, &control)) {
+        DEBUG_PRINT_ERROR("Failed to set Default Priority");
+        eRet = OMX_ErrorUnsupportedSetting;
+    }
     return eRet;
 }
 
@@ -4124,6 +4132,39 @@ OMX_ERRORTYPE  omx_vdec::set_config(OMX_IN OMX_HANDLETYPE      hComp,
             ret = OMX_ErrorBadPortIndex;
         }
 
+        return ret;
+    } else if ((int)configIndex == (int)OMX_IndexConfigPriority) {
+        OMX_PARAM_U32TYPE *priority = (OMX_PARAM_U32TYPE *)configData;
+        DEBUG_PRINT_LOW("Set_config: priority %d", priority->nU32);
+
+        struct v4l2_control control;
+
+        control.id = V4L2_CID_MPEG_VIDC_VIDEO_PRIORITY;
+        if (priority->nU32 == 0)
+            control.value = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_ENABLE;
+        else
+            control.value = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_DISABLE;
+
+        if (ioctl(drv_ctx.video_driver_fd, VIDIOC_S_CTRL, &control)) {
+            DEBUG_PRINT_ERROR("Failed to set Priority");
+            ret = OMX_ErrorUnsupportedSetting;
+        }
+        return ret;
+    } else if ((int)configIndex == (int)OMX_IndexConfigOperatingRate) {
+        OMX_PARAM_U32TYPE *rate = (OMX_PARAM_U32TYPE *)configData;
+        DEBUG_PRINT_LOW("Set_config: operating-rate %u fps", rate->nU32 >> 16);
+
+        struct v4l2_control control;
+
+        control.id = V4L2_CID_MPEG_VIDC_VIDEO_OPERATING_RATE;
+        control.value = rate->nU32;
+
+        if (ioctl(drv_ctx.video_driver_fd, VIDIOC_S_CTRL, &control)) {
+            ret = errno == -EBUSY ? OMX_ErrorInsufficientResources :
+                    OMX_ErrorUnsupportedSetting;
+            DEBUG_PRINT_ERROR("Failed to set operating rate %u fps (%s)",
+                    rate->nU32 >> 16, errno == -EBUSY ? "HW Overload" : strerror(errno));
+        }
         return ret;
     }
 
@@ -8239,7 +8280,7 @@ OMX_ERRORTYPE omx_vdec::update_portdef(OMX_PARAM_PORTDEFINITIONTYPE *portDefn)
 
     if ((portDefn->format.video.eColorFormat == OMX_COLOR_FormatYUV420Planar) ||
        (portDefn->format.video.eColorFormat == OMX_COLOR_FormatYUV420SemiPlanar)) {
-        portDefn->format.video.nStride = drv_ctx.video_resolution.frame_width;
+        portDefn->format.video.nStride = ALIGN(drv_ctx.video_resolution.frame_width, 16);
         portDefn->format.video.nSliceHeight = drv_ctx.video_resolution.frame_height;
     }
     DEBUG_PRINT_HIGH("update_portdef(%lu): Width = %lu Height = %lu Stride = %ld "

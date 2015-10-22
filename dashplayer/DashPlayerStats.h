@@ -33,6 +33,7 @@
 
 #include <utils/RefBase.h>
 #include <utils/threads.h>
+#include <utils/Log.h>
 
 namespace android {
 
@@ -71,11 +72,11 @@ class DashPlayerStats : public RefBase {
     int64_t mNumVideoFramesDecoded;
     int64_t mNumVideoFramesDropped;
     int64_t mConsecutiveFramesDropped;
-    uint32_t mCatchupTimeStart;
+    int64_t mCatchupTimeStart;
     uint32_t mNumTimesSyncLoss;
-    uint32_t mMaxEarlyDelta;
-    uint32_t mMaxLateDelta;
-    uint32_t mMaxTimeSyncLoss;
+    int64_t mMaxEarlyDelta;
+    int64_t mMaxLateDelta;
+    int64_t mMaxTimeSyncLoss;
     uint64_t mTotalFrames;
     int64_t mFirstFrameLatencyStartUs;
     int64_t mLastFrame;

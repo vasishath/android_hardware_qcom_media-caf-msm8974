@@ -48,6 +48,7 @@ enum {
     kKeyWMABitspersample     = 'bsps',  // int64_t
     kKeyWMAVirPktSize        = 'vpks',  // int64_t
     kKeyWMAChannelMask       = 'chmk',  // int32_t
+    kKeyVorbisData           = 'vdat',  // raw data
 
     kKeyFileFormat           = 'ffmt',  // cstring
 
@@ -72,6 +73,7 @@ enum {
     kKeyMinFrmSize        = 'mifs', //int32_t
     kKeyMaxFrmSize        = 'mafs', //int32_t
     kKeyMd5Sum            = 'md5s', //cstring
+    kKeyIsByteMode        = 'bytm', //int32_t
 };
 
 enum {

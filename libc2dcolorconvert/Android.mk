@@ -7,7 +7,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_C_INCLUDES := \
     $(TOP)/frameworks/av-caf/include/media/stagefright \
-    $(TOP)/frameworks/native/include/media/openmax \
+    $(TOP)/frameworks/native-caf/include/media/openmax \
     $(TOP)/hardware/qcom/display-caf-bfam/libcopybit \
     $(TARGET_OUT_HEADERS)/qcom/display-caf-bfam/
 

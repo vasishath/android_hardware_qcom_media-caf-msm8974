@@ -21,7 +21,6 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DASHFactory"
 #include <media/IMediaPlayer.h>
-#include <utils/Log.h>
 #include "DashPlayerDriver.h"
 #include "MediaPlayerFactory.h"
 
@@ -48,8 +47,7 @@ class DashPlayerFactory : public MediaPlayerFactory::IFactory {
         return 0.0;
     }
 
-    virtual sp<MediaPlayerBase> createPlayer() {
-        ALOGV("DashPlayerFactory::createPlayer");
+    virtual sp<MediaPlayerBase> createPlayer(pid_t /*pid*/) {
         return new DashPlayerDriver;
     }
 };

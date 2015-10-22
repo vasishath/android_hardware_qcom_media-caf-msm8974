@@ -27,8 +27,8 @@ LOCAL_CFLAGS += -DMETADATA_FOR_DYNAMIC_MODE
 endif
 
 LOCAL_C_INCLUDES:= \
-        frameworks/native/include/media/openmax \
-        frameworks/native/include/media/hardware
+        frameworks/native-caf/include/media/openmax \
+        frameworks/native-caf/include/media/hardware
 
 LOCAL_SHARED_LIBRARIES :=       \
         libbinder               \

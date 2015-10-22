@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-Copyright (c) 2010-2014, Linux Foundation. All rights reserved.
+Copyright (c) 2010-2015, Linux Foundation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -94,7 +94,7 @@ typedef struct OMXComponentCapabilityFlagsType {
 } OMXComponentCapabilityFlagsType;
 #define OMX_COMPONENT_CAPABILITY_TYPE_INDEX 0xFF7A347
 
-void* message_thread(void *input)
+void* enc_message_thread(void *input)
 {
     omx_video* omx = reinterpret_cast<omx_video*>(input);
     unsigned char id;
@@ -211,9 +211,11 @@ VideoHeap::VideoHeap(int fd, size_t size, void* base)
 omx_video::omx_video():
     secure_session(false),
     c2d_opened(false),
-    mUsesColorConversion(false),
     psource_frame(NULL),
     pdest_frame(NULL),
+    mEmptyEosBuffer(NULL),
+    m_pipe_in(-1),
+    m_pipe_out(-1),
     m_pInput_pmem(NULL),
     m_pOutput_pmem(NULL),
 #ifdef USE_ION
@@ -248,6 +250,7 @@ omx_video::omx_video():
     async_thread_created = false;
     msg_thread_created = false;
 
+    mUsesColorConversion = false;
     pthread_mutex_init(&m_lock, NULL);
     sem_init(&m_cmd_lock,0,0);
 }
@@ -269,8 +272,8 @@ omx_video::omx_video():
 omx_video::~omx_video()
 {
     DEBUG_PRINT_HIGH("~omx_video(): Inside Destructor()");
-    if (m_pipe_in) close(m_pipe_in);
-    if (m_pipe_out) close(m_pipe_out);
+    if (m_pipe_in >= 0) close(m_pipe_in);
+    if (m_pipe_out >= 0) close(m_pipe_out);
     DEBUG_PRINT_HIGH("omx_video: Waiting on Msg Thread exit");
     if (msg_thread_created)
         pthread_join(msg_thread_id,NULL);
@@ -2613,7 +2616,7 @@ OMX_ERRORTYPE omx_video::allocate_input_meta_buffer(
         OMX_U32              bytes)
 {
     unsigned index = 0;
-    if (!bufferHdr || bytes != sizeof(encoder_media_buffer_type)) {
+    if (!bufferHdr || bytes < sizeof(encoder_media_buffer_type)) {
         DEBUG_PRINT_ERROR("wrong params allocate_input_meta_buffer Hdr %p len %lu",
                 bufferHdr,bytes);
         return OMX_ErrorBadParameter;
@@ -3360,8 +3363,8 @@ OMX_ERRORTYPE  omx_video::empty_this_buffer_proxy(OMX_IN OMX_HANDLETYPE         
     }
 #endif
 #ifdef _ANDROID_ICS_
-    if (meta_mode_enable && !mUseProxyColorFormat) {
-        // Camera or Gralloc-source meta-buffers queued with pre-announced color-format
+    if (meta_mode_enable && !mUsesColorConversion) {
+        // Camera or Gralloc-source meta-buffers queued with encodeable color-format
         struct pmem Input_pmem_info;
         if (!media_buffer) {
             DEBUG_PRINT_ERROR("%s: invalid media_buffer",__FUNCTION__);
@@ -3393,19 +3396,6 @@ OMX_ERRORTYPE  omx_video::empty_this_buffer_proxy(OMX_IN OMX_HANDLETYPE         
         }
         if (dev_use_buf(&Input_pmem_info,PORT_INDEX_IN,0) != true) {
             DEBUG_PRINT_ERROR("ERROR: in dev_use_buf");
-            post_event ((unsigned int)buffer,0,OMX_COMPONENT_GENERATE_EBD);
-            return OMX_ErrorBadParameter;
-        }
-    } else if (meta_mode_enable && !mUsesColorConversion) {
-        // Graphic-source meta-buffers queued with opaque color-format
-        if (media_buffer->buffer_type == kMetadataBufferTypeGrallocSource) {
-            private_handle_t *handle = (private_handle_t *)media_buffer->meta_handle;
-            fd = handle->fd;
-            DEBUG_PRINT_LOW("ETB (opaque-gralloc) fd = %d, size = %d",
-                    fd, handle->size);
-        } else {
-            DEBUG_PRINT_ERROR("ERROR: Invalid bufferType for buffer with Opaque"
-                    " color format");
             post_event ((unsigned int)buffer,0,OMX_COMPONENT_GENERATE_EBD);
             return OMX_ErrorBadParameter;
         }
@@ -3981,7 +3971,13 @@ OMX_ERRORTYPE omx_video::empty_buffer_done(OMX_HANDLETYPE         hComp,
             DEBUG_PRINT_LOW("empty_buffer_done pdest_frame address is %p",pdest_frame);
             return push_input_buffer(hComp);
         }
-        if (mUsesColorConversion) {
+        //check if empty-EOS-buffer is being returned, treat this same as the
+        //color-conversion case as we queued a color-conversion buffer to encoder
+        bool handleEmptyEosBuffer = (mEmptyEosBuffer == buffer);
+        if (mUsesColorConversion || handleEmptyEosBuffer) {
+            if (handleEmptyEosBuffer) {
+                mEmptyEosBuffer = NULL;
+            }
             // return color-conversion buffer back to the pool
             DEBUG_PRINT_LOW("empty_buffer_done insert address is %p",buffer);
             if (!m_opq_pmem_q.insert_entry((unsigned int)buffer, 0, 0)) {
@@ -3991,10 +3987,9 @@ OMX_ERRORTYPE omx_video::empty_buffer_done(OMX_HANDLETYPE         hComp,
         } else {
             // We are not dealing with color-conversion, Buffer being returned
             // here is client's buffer, return it back to client
-            OMX_BUFFERHEADERTYPE* il_buffer = &meta_buffer_hdr[buffer_index];
-            if (m_pCallbacks.EmptyBufferDone && il_buffer) {
-                m_pCallbacks.EmptyBufferDone(hComp, m_app_data, il_buffer);
-                DEBUG_PRINT_LOW("empty_buffer_done: Returning client buf %p",il_buffer);
+            if (m_pCallbacks.EmptyBufferDone && buffer) {
+                m_pCallbacks.EmptyBufferDone(hComp, m_app_data, buffer);
+                DEBUG_PRINT_LOW("empty_buffer_done: Returning client buf %p", buffer);
             }
         }
     } else if (m_pCallbacks.EmptyBufferDone) {
@@ -4297,7 +4292,7 @@ void omx_video::omx_release_meta_buffer(OMX_BUFFERHEADERTYPE *buffer)
         bool meta_error = false;
 
         index_pmem = (buffer - m_inp_mem_ptr);
-        if (mUseProxyColorFormat &&
+        if (mUsesColorConversion &&
                 (index_pmem < m_sInPortDef.nBufferCountActual)) {
             if (!dev_free_buf((&m_pInput_pmem[index_pmem]),PORT_INDEX_IN)) {
                 DEBUG_PRINT_ERROR("omx_release_meta_buffer dev free failed");
@@ -4470,6 +4465,7 @@ OMX_ERRORTYPE  omx_video::empty_this_buffer_opaque(OMX_IN OMX_HANDLETYPE hComp,
     unsigned nBufIndex = 0;
     OMX_ERRORTYPE ret = OMX_ErrorNone;
     encoder_media_buffer_type *media_buffer;
+    private_handle_t *handle = NULL;
     DEBUG_PRINT_LOW("ETBProxyOpaque: buffer[%p]", buffer);
 
     if (buffer == NULL) {
@@ -4483,17 +4479,28 @@ OMX_ERRORTYPE  omx_video::empty_this_buffer_opaque(OMX_IN OMX_HANDLETYPE hComp,
         return OMX_ErrorBadParameter;
     }
     media_buffer = (encoder_media_buffer_type *)buffer->pBuffer;
-    if (!media_buffer || !media_buffer->meta_handle) {
+    if (!media_buffer && !(buffer->nFlags & OMX_BUFFERFLAG_EOS)) {
+        DEBUG_PRINT_ERROR("NULL pointer is passed as media buffer");
+        m_pCallbacks.EmptyBufferDone(hComp, m_app_data, buffer);
+        return OMX_ErrorBadParameter;
+    } else if ((!media_buffer->meta_handle)  &&
+            !(buffer->nFlags & OMX_BUFFERFLAG_EOS)) {
         DEBUG_PRINT_ERROR("Incorrect Buffer queued media buffer = %p",
             media_buffer);
         m_pCallbacks.EmptyBufferDone(hComp, m_app_data, buffer);
         return OMX_ErrorBadParameter;
+    } else if (media_buffer) {
+        handle = (private_handle_t *)media_buffer->meta_handle;
     }
-    private_handle_t *handle = (private_handle_t *)media_buffer->meta_handle;
+
+    if (media_buffer->buffer_type == kMetadataBufferTypeCameraSource) {
+        return empty_this_buffer_proxy(hComp, buffer);
+    }
+
     /*Enable following code once private handle color format is
       updated correctly*/
 
-    if (buffer->nFilledLen > 0) {
+    if (buffer->nFilledLen > 0 && handle) {
         if (c2d_opened && handle->format != c2d_conv.get_src_format()) {
             c2d_conv.close();
             c2d_opened = false;
@@ -4686,6 +4693,14 @@ OMX_ERRORTYPE omx_video::push_input_buffer(OMX_HANDLETYPE hComp)
                     index,m_sInPortDef.nBufferCountActual);
             return OMX_ErrorBadParameter;
         }
+
+        //Meta-Buffer with empty filled-length can contain garbage handle
+        //Some clients queue such buffers to signal EOS. Handle this case
+        // separately by queueing an intermediate color-conversion buffer
+        // and propagate the EOS.
+        if (psource_frame->nFilledLen == 0 && (psource_frame->nFlags & OMX_BUFFERFLAG_EOS)) {
+            return push_empty_eos_buffer(hComp, psource_frame);
+        }
         media_buffer = (encoder_media_buffer_type *)psource_frame->pBuffer;
         /*Will enable to verify camcorder in current TIPS can be removed*/
         if (media_buffer->buffer_type == kMetadataBufferTypeCameraSource) {
@@ -4697,8 +4712,6 @@ OMX_ERRORTYPE omx_video::push_input_buffer(OMX_HANDLETYPE hComp)
                     Input_pmem_info.offset,
                     Input_pmem_info.size);
             ret = queue_meta_buffer(hComp,Input_pmem_info);
-        } else if ((psource_frame->nFlags & OMX_BUFFERFLAG_EOS) && mUseProxyColorFormat) {
-            ret = convert_queue_buffer(hComp,Input_pmem_info,index);
         } else {
             private_handle_t *handle = (private_handle_t *)media_buffer->meta_handle;
             Input_pmem_info.buffer = media_buffer;
@@ -4714,4 +4727,64 @@ OMX_ERRORTYPE omx_video::push_input_buffer(OMX_HANDLETYPE hComp)
         }
     }
     return ret;
+}
+
+OMX_ERRORTYPE omx_video::push_empty_eos_buffer(OMX_HANDLETYPE hComp,
+        OMX_BUFFERHEADERTYPE* buffer) {
+    OMX_BUFFERHEADERTYPE* opqBuf = NULL;
+    OMX_ERRORTYPE retVal = OMX_ErrorNone;
+    do {
+        if (pdest_frame) {
+            //[1] use a checked out conversion buffer, if one is available
+            opqBuf = pdest_frame;
+            pdest_frame = NULL;
+        } else if (m_opq_pmem_q.m_size) {
+            //[2] else pop out one from the queue, if available
+            unsigned address = 0, p2, id;
+            m_opq_pmem_q.pop_entry(&address,&p2,&id);
+            opqBuf = (OMX_BUFFERHEADERTYPE* ) address;
+        }
+        unsigned index = opqBuf - m_inp_mem_ptr;
+        if (!opqBuf || index >= m_sInPortDef.nBufferCountActual) {
+            DEBUG_PRINT_ERROR("push_empty_eos_buffer: Could not find a "
+                    "color-conversion buffer to queue ! defer until available");
+            //[3] else, returning back will defer calling this function again
+            //until a conversion buffer is returned by the encoder and also
+            //hold on to the client's buffer
+            return OMX_ErrorNone;
+        }
+        struct pmem Input_pmem_info;
+        Input_pmem_info.buffer = opqBuf;
+        Input_pmem_info.fd = m_pInput_pmem[index].fd;
+        Input_pmem_info.offset = 0;
+        Input_pmem_info.size = m_pInput_pmem[index].size;
+
+        if (dev_use_buf(&Input_pmem_info, PORT_INDEX_IN, 0) != true) {
+            DEBUG_PRINT_ERROR("ERROR: in dev_use_buf for empty eos buffer");
+            retVal = OMX_ErrorBadParameter;
+            break;
+        }
+
+        //Queue with null pBuffer, as pBuffer in client's hdr can be junk
+        //Clone the color-conversion buffer to avoid overwriting original buffer
+        OMX_BUFFERHEADERTYPE emptyEosBufHdr;
+        memcpy(&emptyEosBufHdr, opqBuf, sizeof(OMX_BUFFERHEADERTYPE));
+        emptyEosBufHdr.nFilledLen = 0;
+        emptyEosBufHdr.nTimeStamp = buffer->nTimeStamp;
+        emptyEosBufHdr.nFlags = buffer->nFlags;
+        emptyEosBufHdr.pBuffer = NULL;
+        if (dev_empty_buf(&emptyEosBufHdr, 0, index, m_pInput_pmem[index].fd) != true) {
+            DEBUG_PRINT_ERROR("ERROR: in dev_empty_buf for empty eos buffer");
+            dev_free_buf(&Input_pmem_info, PORT_INDEX_IN);
+            retVal = OMX_ErrorBadParameter;
+            break;
+        }
+        mEmptyEosBuffer = opqBuf;
+    } while(false);
+
+    //return client's buffer regardless since intermediate color-conversion
+    //buffer is sent to the the encoder
+    m_pCallbacks.EmptyBufferDone(hComp, m_app_data, buffer);
+    --pending_input_buffers;
+    return retVal;
 }

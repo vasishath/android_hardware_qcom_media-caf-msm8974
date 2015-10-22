@@ -25,17 +25,29 @@
 namespace android {
 
 struct ABuffer;
+struct MediaCodec;
 
 struct DashPlayer::Decoder : public AHandler {
     Decoder(const sp<AMessage> &notify,
-            const sp<NativeWindowWrapper> &nativeWindow = NULL);
+            const sp<Surface> &nativeWindow = NULL);
 
     void configure(const sp<MetaData> &meta);
+    void init();
 
     void signalFlush();
     void signalResume();
     void initiateShutdown();
-    void setSink(const sp<MediaPlayerBase::AudioSink> &sink, sp<Renderer> Renderer);
+
+
+    enum {
+        kWhatFillThisBuffer      = 'flTB',
+        kWhatDrainThisBuffer     = 'drTB',
+        kWhatOutputFormatChanged = 'fmtC',
+        kWhatFlushCompleted      = 'flsC',
+        kWhatShutdownCompleted   = 'shDC',
+        kWhatEOS                 = 'eos ',
+        kWhatError               = 'err ',
+    };
 
 protected:
     virtual ~Decoder();
@@ -45,22 +57,45 @@ protected:
 private:
     enum {
         kWhatCodecNotify        = 'cdcN',
+        kWhatConfigure          = 'conf',
+        kWhatInputBufferFilled  = 'inpF',
+        kWhatRenderBuffer       = 'rndr',
+        kWhatFlush              = 'flus',
+        kWhatShutdown           = 'shuD',
     };
 
     sp<AMessage> mNotify;
-    sp<NativeWindowWrapper> mNativeWindow;
+    sp<Surface> mNativeWindow;
 
-    sp<DashCodec> mCodec;
+    sp<AMessage> mInputFormat;
+    sp<AMessage> mOutputFormat;
+    sp<MediaCodec> mCodec;
     sp<ALooper> mCodecLooper;
-    sp<MediaPlayerBase::AudioSink> mAudioSink;
-    sp<Renderer> mRenderer;
+    sp<ALooper> mDecoderLooper;
 
-    Vector<sp<ABuffer> > mCSD;
-    size_t mCSDIndex;
+    Vector<sp<ABuffer> > mInputBuffers;
+    Vector<sp<ABuffer> > mOutputBuffers;
+
+    void handleError(int32_t err);
+    bool handleAnInputBuffer();
+    bool handleAnOutputBuffer();
+
+    void requestCodecNotification();
+    bool isStaleReply(const sp<AMessage> &msg);
+
+    int mLogLevel;
 
     sp<AMessage> makeFormat(const sp<MetaData> &meta);
 
-    void onFillThisBuffer(const sp<AMessage> &msg);
+    void onConfigure(const sp<AMessage> &format);
+    void onFlush();
+    void onInputBufferFilled(const sp<AMessage> &msg);
+    void onRenderBuffer(const sp<AMessage> &msg);
+    void onShutdown();
+
+    int32_t mBufferGeneration;
+    AString mComponentName;
+
 
     DISALLOW_EVIL_CONSTRUCTORS(Decoder);
 };
