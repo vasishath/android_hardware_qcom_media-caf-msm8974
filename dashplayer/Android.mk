@@ -36,8 +36,8 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/av-caf/media/libstagefright/include             \
 	$(TOP)/frameworks/av-caf/media/libstagefright/mpeg2ts             \
 	$(TOP)/frameworks/av-caf/media/libstagefright/rtsp                \
-	$(TOP)/hardware/qcom/media-caf-bfam/mm-core/inc                        \
-	$(TOP)/hardware/qcom/display-caf-bfam/libgralloc                       \
+	$(TOP)/hardware/qcom/media-caf-msm8974/mm-core/inc                        \
+	$(TOP)/hardware/qcom/display-caf-msm8974/libgralloc                       \
     $(LOCAL_PATH)/../QCMediaPlayer/native                         \
 	$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
